@@ -1,0 +1,36 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16
+    container_name: carrier_db
+    restart: always
+    environment:
+      POSTGRES_USER: carrier
+      POSTGRES_PASSWORD: carrierpass
+      POSTGRES_DB: carrierdb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"  # optional expose for local psql
+
+  web:
+    build: .
+    container_name: carrier_app
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      # Local connection string (no ssl)
+      DATABASE_URL: postgresql://carrier:carrierpass@db:5432/carrierdb
+      # Token used by your HappyRobot POST
+      DASH_TOKEN: dev-secret-token
+      # Optional: set explicit PORT for uvicorn
+      PORT: 8000
+    ports:
+      - "8000:8000"
+    # If you want auto-reload in dev, mount code:
+    # volumes:
+    #   - .:/app
+
+volumes:
+  pgdata:
