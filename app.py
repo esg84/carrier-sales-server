@@ -1,6 +1,9 @@
-from fastapi import FastAPI, Query
+from pydantic import BaseModel
+from fastapi import FastAPI, Query, Body, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional
+from typing import Optional, List, Dict
+from datetime import datetime
+import os
 
 app = FastAPI(title="Loads API", version="1.0.0")
 
@@ -50,3 +53,44 @@ def search_loads(
     if min_rate is not None:
         rows = [r for r in rows if r["loadboard_rate"] >= min_rate]
     return {"data": rows}
+
+
+##POST step
+# in-memory "DB"
+EVENTS: List[Dict] = []
+
+# optional simple auth
+DASH_TOKEN = os.getenv("DASH_TOKEN", "change-me")
+
+class CallEvent(BaseModel):
+    call_date: Optional[str] = None
+    base_price: Optional[str] = None
+    final_price: Optional[str] = None
+    load_origin: Optional[str] = None
+    load_destination: Optional[str] = None
+    call_outcome: Optional[str] = None
+    call_duration: Optional[str] = None
+    is_negotiated: Optional[str] = None
+    carrier_sentiment: Optional[str] = None
+    mc_number: Optional[str] = None
+    carrier_name: Optional[str] = None
+
+@app.post("/data/outcome")
+def outcome_event(
+    payload: CallEvent = Body(...),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None)
+):
+    # accept either "Authorization: Bearer <token>" or "X-API-Key: <token>"
+    token = (authorization or "").replace("Bearer ", "") or (x_api_key or "")
+    if DASH_TOKEN and token != DASH_TOKEN:
+        raise HTTPException(status_code=401, detail="invalid token")
+
+    event = payload.model_dump()
+    event.setdefault("server_received_at", datetime.utcnow().isoformat() + "Z")
+    EVENTS.append(event)
+    return {"ok": True, "stored": len(EVENTS)}
+
+@app.get("/data/events")
+def list_events():
+    return {"data": EVENTS}
