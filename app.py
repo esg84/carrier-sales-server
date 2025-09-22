@@ -64,15 +64,12 @@ DASH_TOKEN = os.getenv("DASH_TOKEN", "change-me")
 
 class CallEvent(BaseModel):
     call_date: Optional[str] = None
-    base_price: Optional[str] = None
-    final_price: Optional[str] = None
+    base_price: Optional[int] = None
+    final_price: Optional[int] = None
     load_origin: Optional[str] = None
-    load_destination: Optional[str] = None
     call_outcome: Optional[str] = None
-    call_duration: Optional[str] = None
-    is_negotiated: Optional[str] = None
-    carrier_sentiment: Optional[str] = None
-    mc_number: Optional[str] = None
+    sentiment: Optional[str] = None
+    mc_number: Optional[int] = None
     carrier_name: Optional[str] = None
 
 @app.post("/data/outcome")
