@@ -147,9 +147,9 @@ def outcome_event(
     return {"ok": True, "id": row.id, "stored": stored}
 
     @app.get("/data/events")
-def list_events(limit: int = 100, offset: int = 0):
-    with SessionLocal() as s:
-        q = s.query(EventRow).order_by(EventRow.id.desc()).offset(offset).limit(limit)
+    def list_events(limit: int = 100, offset: int = 0):
+        with SessionLocal() as s:
+            q = s.query(EventRow).order_by(EventRow.id.desc()).offset(offset).limit(limit)
         rows = q.all()
         def to_dict(r: EventRow):
             return {
