@@ -2,9 +2,10 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.db
+*.log
 .env
-.wheels/
-dist/
-build/
+.venv/
 .git/
+.gitignore
+*.sqlite3
+node_modules/
