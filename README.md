@@ -2,62 +2,91 @@
 
 ## Carrier Sales: Server
 
-This is FastAPI-based server to manage carrier sales data. It is deployed on Render.
+This is a FastAPI-based server to manage carrier sales data. It is deployed on Render.
 
 ## Overview
 
-The server provides two main endpoints:
-- Load data retrieval: Used by the agent to get available loads based on client specifications
-- Post call data: Used by agent to add 'outcome' produced by the call to the database (i.e. final price, sentiment, load origin, etc...)
+The server provides three main components:
 
-All endpoints require API key authentication via the `X-API-Key` header and are served over HTTPS.
+- **Loads API**: Retrieve available loads based on client specifications  
+- **Call Data API**: Post call outcomes to the database (final price, sentiment, load origin, etc.)  
+- **Dashboard**: A lightweight web UI for viewing call and load information, served at `/dashboard`
+
+All endpoints require authentication via an API key. The key can be passed either in the `x-api-key` header (preferred for API calls) or as a query/path token for browser access to `/dashboard`.
+
+---
 
 ## Components
 
-- **API Layer**: FastAPI application with two main routers (loads and data posting)
-- **Security**: API key validation using environment variables
-- **Data**: Sample loads for challenge demo purposes
+- **API Layer**: FastAPI application (`app.py`) with routes for loads, outcome ingestion, and dashboard rendering  
+- **Security**: API key validation using environment variables  
+- **Database**: Loads and call outcome data (connected via `DATABASE_URL`)  
+
+---
 
 ## Deployment
 
 ### API Key
-1. Generate API key using the script:
-```bash
-python scripts/generate_api_key.py
-```
-2. Store the generated key:
-   - Local: Add to docker run command: `-e API_KEY="YOUR_GENERATED_KEY"`
-   - Production: Add to Render environment variables (key: API_KEY)
 
+1. Generate an API key:
+   ```bash
+   python scripts/generate_api_key.py
+   ```
+2. Store the key as an environment variable:
+   - **Local**:  
+     ```bash
+     export API_KEY="YOUR_GENERATED_KEY"
+     ```
+   - **Docker run**:  
+     ```bash
+     docker run -p 8000:8000        -e DATABASE_URL="your_db_url"        -e API_KEY="YOUR_GENERATED_KEY"        carrier-campaign-server
+     ```
+   - **Production (Render)**: Add environment variable  
+     ```
+     KEY: API_KEY
+     VALUE: YOUR_GENERATED_KEY
+     ```
+
+(Optional) You can also set a shorter `DASH_TOKEN` for browser access:
+```
+KEY: DASH_TOKEN
+VALUE: short_random_token
+```
+
+---
 
 ### Local Development
-1. Install Docker
-2. Build and run:
-```docker build -t carrier-campaign-server .
-docker run -p 8000:8000 \
-  -e DATABASE_URL="your_db_url" \
-  -e API_KEY="YOUR_GENERATED_KEY" \
-  carrier-campaign-server
 
-```
-## Accessing Deployment: API Endpoints
+1. Install Docker  
+2. Build and run the service:  
+   ```bash
+   docker build -t carrier-campaign-server .
+   docker run -p 8000:8000      -e DATABASE_URL="your_db_url"      -e API_KEY="YOUR_GENERATED_KEY"      carrier-campaign-server
+   ```
+3. The API will be available at http://localhost:8000  
+4. The dashboard will be available at http://localhost:8000/dashboard  
 
-### Get Loads
+---
+
+## Accessing Deployment
+
+### API Endpoints
+
+#### Get Loads
 ```http
 GET https://carrier-sales-server.onrender.com/v1/loads/search
-Header: X-API-Key: your_api_key
+Header: x-api-key: YOUR_API_KEY
 ```
 
-### Ingest Call Data
+#### Ingest Call Data
 ```http
 POST https://carrier-sales-server.onrender.com/data/outcome
-Header: X-API-Key: your_api_key
+Header: x-api-key: YOUR_API_KEY
 ```
 
-Request body:
+Request body example:
 ```json
 {
-
   "call_date": "Saturday, September 20, 2025 18:42:40 -0500",
   "base_price": "1400",
   "final_price": "1900",
@@ -66,32 +95,28 @@ Request body:
   "sentiment": "neutral",
   "mc_number": "323241",
   "carrier_name": "B & J TRUCKING & EXCAVATION"
-
 }
 ```
 
-> Note: The deployed instance on Render's free tier may take a few moments to spin up after periods of inactivity.
+---
 
-# Carrier Sales Dashboard
+### Dashboard Access
 
-A dashboard for visualizing carrier campaign call data, featuring call outcomes, sentiment analysis, and negotiation metrics.
-
-
-## Deployment
-
-### Local Development
-
-1. Install Docker
-2. Build and run:
-```docker build -f Dockerfile.dashboard -t carrier-campaign-dashboard .
-docker run -p 8501:8501 \
-  -e DATABASE_URL="your_db_url" \
-  carrier-sales-dashboard
+The dashboard is hosted as part of the same FastAPI service:  
+```
+https://carrier-sales-server.onrender.com/dashboard
 ```
 
-The dashboard will be available at http://localhost:8501/
+Authentication options:
+- API header:  
+  `x-api-key: YOUR_API_KEY`
+- Query param:  
+  `https://carrier-sales-server.onrender.com/dashboard?key=YOUR_API_KEY`  
+  or (if you set `DASH_TOKEN`)  
+  `https://carrier-sales-server.onrender.com/dashboard?key=YOUR_DASH_TOKEN`
+- Path token:  
+  `https://carrier-sales-server.onrender.com/dashboard/YOUR_DASH_TOKEN`
 
+---
 
-## Access
-
-The dashboard is hosted at: https://carrier-sales-server.onrender.com/dashboard
+> **Note**: On Render’s free tier, the instance may take a few moments to spin up after inactivity.
