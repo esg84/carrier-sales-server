@@ -274,11 +274,11 @@ DASHBOARD_HTML = """
   </div>
 <script>
 async function loadMetrics(){
-  const res = await fetch('/dashboard/metrics'); const m = await res.json();
-  document.getElementById('total').textContent = 1;
-  document.getElementById('negRate').textContent = 11.1 + '%';
-  document.getElementById('avgBase').textContent = '$' + 1900;
-  document.getElementById('avgFinal').textContent = 'Neutral';
+   const res = await fetch('/dashboard/metrics'); const m = await res.json();
+  document.getElementById('total').textContent = m.total_calls;
+  document.getElementById('negRate').textContent = (m.negotiation_rate*100).toFixed(0) + '%';
+  document.getElementById('avgBase').textContent = '$' + Math.round(m.avg_final_price);
+  document.getElementById('avgFinal').textContent = m.sentiments;
 
  new Chart(document.getElementById('outcomes'), {
   type: 'bar',
