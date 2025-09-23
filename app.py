@@ -194,55 +194,61 @@ def outcome_event(
     if DASH_TOKEN and token != DASH_TOKEN:
         raise HTTPException(status_code=401, detail="invalid token")
 
-bp = _as_int(payload.base_price)
-fp = _as_int(payload.final_price)
-explicit_neg = _as_bool(payload.is_negotiated)
-neg_flag = _infer_is_negotiated(bp, fp, explicit_neg)
+    # --- normalize inputs and infer negotiation flag ---
+    bp = _as_int(payload.base_price)
+    fp = _as_int(payload.final_price)
+    explicit_neg = _as_bool(payload.is_negotiated)
+    neg_flag = _infer_is_negotiated(bp, fp, explicit_neg)
 
-row = EventRow(
-    call_date = payload.call_date,
-    base_price = bp,
-    final_price = fp,
-    load_origin = payload.load_origin,
-    load_destination = payload.load_destination,
-    call_outcome = payload.call_outcome,
-    call_duration = _as_int(payload.call_duration),
-    is_negotiated = neg_flag,  
-    carrier_sentiment = (payload.sentiment or payload.carrier_sentiment),
-    mc_number = payload.mc_number,
-    carrier_name = payload.carrier_name,
-    server_received_at = datetime.utcnow()
-)
+    row = EventRow(
+        call_date = payload.call_date,
+        base_price = bp,
+        final_price = fp,
+        load_origin = payload.load_origin,
+        load_destination = payload.load_destination,
+        call_outcome = payload.call_outcome,
+        call_duration = _as_int(payload.call_duration),
+        is_negotiated = neg_flag,
+        carrier_sentiment = (payload.sentiment or payload.carrier_sentiment),
+        mc_number = payload.mc_number,
+        carrier_name = payload.carrier_name,
+        server_received_at = datetime.utcnow()
+    )
 
     with SessionLocal() as s:
         s.add(row)
         s.commit()
         s.refresh(row)
         stored = s.query(EventRow).count()
+
     return {"ok": True, "id": row.id, "stored": stored}
 
-    @app.get("/data/events")
-    def list_events(limit: int = 100, offset: int = 0):
-        with SessionLocal() as s:
-            q = s.query(EventRow).order_by(EventRow.id.desc()).offset(offset).limit(limit)
+
+@app.get("/data/events")
+def list_events(limit: int = 100, offset: int = 0):
+    with SessionLocal() as s:
+        q = s.query(EventRow).order_by(EventRow.id.desc()).offset(offset).limit(limit)
         rows = q.all()
-        def to_dict(r: EventRow):
-            return {
-                "id": r.id,
-                "server_received_at": r.server_received_at.isoformat() + "Z",
-                "call_date": r.call_date,
-                "base_price": r.base_price,
-                "final_price": r.final_price,
-                "load_origin": r.load_origin,
-                "load_destination": r.load_destination,
-                "call_outcome": r.call_outcome,
-                "call_duration": r.call_duration,
-                "is_negotiated": r.is_negotiated,
-                "carrier_sentiment": r.carrier_sentiment,
-                "mc_number": r.mc_number,
-                "carrier_name": r.carrier_name,
-            }
-        return {"data": [to_dict(r) for r in rows]}
+
+    def to_dict(r: EventRow):
+        return {
+            "id": r.id,
+            "server_received_at": r.server_received_at.isoformat() + "Z",
+            "call_date": r.call_date,
+            "base_price": r.base_price,
+            "final_price": r.final_price,
+            "load_origin": r.load_origin,
+            "load_destination": r.load_destination,
+            "call_outcome": r.call_outcome,
+            "call_duration": r.call_duration,
+            "is_negotiated": r.is_negotiated,
+            "carrier_sentiment": r.carrier_sentiment,
+            "mc_number": r.mc_number,
+            "carrier_name": r.carrier_name,
+        }
+
+    return {"data": [to_dict(r) for r in rows]}
+
 
     
 @app.get("/dashboard/metrics")
