@@ -192,7 +192,7 @@ def outcome_event(
         call_outcome = payload.call_outcome,
         call_duration = _as_int(payload.call_duration),
         is_negotiated = _as_bool(payload.is_negotiated),
-        carrier_sentiment = payload.carrier_sentiment,
+        carrier_sentiment = (payload.sentiment or payload.carrier_sentiment),
         mc_number = payload.mc_number,
         carrier_name = payload.carrier_name,
         server_received_at = datetime.utcnow()
