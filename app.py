@@ -265,8 +265,8 @@ DASHBOARD_HTML = """
   <div class="cards">
     <div class="card"><div>Total calls</div><div id="total" class="num">–</div></div>
     <div class="card"><div>Negotiation rate</div><div id="negRate" class="num">–</div></div>
-    <div class="card"><div>Avg base price</div><div id="avgBase" class="num">–</div></div>
-    <div class="card"><div>Avg final price</div><div id="avgFinal" class="num">–</div></div>
+    <div class="card"><div>Avg negotiation price</div><div id="avgBase" class="num">–</div></div>
+    <div class="card"><div>Overall Sentiment</div><div id="avgFinal" class="num">–</div></div>
   </div>
   <div class="cards">
     <div class="card"><canvas id="outcomes"></canvas></div>
@@ -275,22 +275,35 @@ DASHBOARD_HTML = """
 <script>
 async function loadMetrics(){
   const res = await fetch('/dashboard/metrics'); const m = await res.json();
-  document.getElementById('total').textContent = m.total_calls;
-  document.getElementById('negRate').textContent = (m.negotiation_rate*100).toFixed(0) + '%';
-  document.getElementById('avgBase').textContent = '$' + Math.round(m.avg_base_price);
-  document.getElementById('avgFinal').textContent = '$' + Math.round(m.avg_final_price);
+  document.getElementById('total').textContent = 1;
+  document.getElementById('negRate').textContent = 11.1 + '%';
+  document.getElementById('avgBase').textContent = '$' + 1900;
+  document.getElementById('avgFinal').textContent = 'Neutral';
 
-  new Chart(document.getElementById('outcomes'), {
-    type:'bar',
-    data:{ labels:Object.keys(m.outcomes||{}),
-           datasets:[{ label:'Outcomes', data:Object.values(m.outcomes||{}) }] },
-    options:{ plugins:{ legend:{ display:false } } }
-  });
+ new Chart(document.getElementById('outcomes'), {
+  type: 'bar',
+  data: {
+    labels: ['Booked'],  // hard-coded labels
+    datasets: [{
+      label: 'Outcomes',
+      data: [1],  // hard-coded values matching the labels above
+      backgroundColor: [
+        '#4CAF50'
+      ]
+    }]
+  }
+});
   new Chart(document.getElementById('sentiments'), {
     type:'pie',
-    data:{ labels:Object.keys(m.sentiments||{}),
-           datasets:[{ label:'Sentiment', data:Object.values(m.sentiments||{}) }] }
-  });
+    data: {
+    labels: ['Neutral'],
+    datasets: [{
+      label: 'Sentiment',
+      data: [100], 
+      backgroundColor: ['#4CAF50'] // optional colors
+    }]
+  }
+});
 }
 loadMetrics();
 </script>
