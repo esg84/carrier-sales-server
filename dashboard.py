@@ -4,9 +4,9 @@ import streamlit as st
 import pandas as pd
 from sqlalchemy import create_engine, text
 
-st.set_page_config(page_title="Carrier Campaign Dashboard", layout="wide")
+st.set_page_config(page_title="Carrier Sales Dashboard", layout="wide")
 
-st.title("Carrier Campaign Dashboard")
+st.title("Carrier Sales Dashboard")
 
 db_url = os.getenv("DATABASE_URL")
 if not db_url:
