@@ -11,6 +11,44 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import Integer, String, Boolean, DateTime
 
+# ---------- Pydantic compatibility & helpers ----------
+try:
+    # Pydantic v2
+    from pydantic import BaseModel, field_validator as _validator  # type: ignore
+    _P2 = True
+except Exception:
+    # Pydantic v1
+    from pydantic import BaseModel, validator as _validator  # type: ignore
+    _P2 = False
+
+
+def _coerce_int_like(v) -> Optional[int]:
+    """
+    Accept None, "", "$1,900", "1,900", "1900", 1900, 1900.0.
+    Returns int or None. Non-numeric -> None.
+    """
+    if v is None:
+        return None
+    if isinstance(v, int):
+        return v
+    if isinstance(v, float):
+        try:
+            return int(v)
+        except Exception:
+            return None
+    if isinstance(v, str):
+        s = v.strip()
+        if s == "":
+            return None
+        digits = "".join(ch for ch in s if ch.isdigit())
+        if digits == "":
+            return None
+        try:
+            return int(digits)
+        except ValueError:
+            return None
+    return None
+# ------------------------------------------------------
 
 app = FastAPI(title="Loads API", version="1.0.0")
 
