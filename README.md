@@ -21,16 +21,23 @@ All endpoints require API key authentication via the `X-API-Key` header and are 
 ## Deployment
 
 ### API Key
-**ELENI TO DO**
+1. Generate API key using the script:
+```bash
+python scripts/generate_api_key.py
+```
+2. Store the generated key:
+   - Local: Add to docker run command: `-e API_KEY="YOUR_GENERATED_KEY"`
+   - Production: Add to Render environment variables (key: API_KEY)
+
 
 ### Local Development
 1. Install Docker
 2. Build and run:
-```docker build -t carrier-app .
-docker run -it --rm -p 8000:8000 \
-  -e DATABASE_URL="postgresql://carrier:carrierpass@host.docker.internal:5432/carrierdb" \
-  -e DASH_TOKEN=dev-secret-token \
-  carrier-app
+```docker build -t carrier-campaign-server .
+docker run -p 8000:8000 \
+  -e DATABASE_URL="your_db_url" \
+  -e API_KEY="YOUR_GENERATED_KEY" \
+  carrier-campaign-server
 
 ```
 ## Accessing Deployment: API Endpoints
@@ -65,19 +72,10 @@ Request body:
 
 > Note: The deployed instance on Render's free tier may take a few moments to spin up after periods of inactivity.
 
-# Carrier Campaign Dashboard
+# Carrier Sales Dashboard
 
 A dashboard for visualizing carrier campaign call data, featuring call outcomes, sentiment analysis, and negotiation metrics.
 
-## Structure
-
-- `app/` - Main application code
-  - `components/` - Reusable UI components
-  - `services/` - Data processing and business logic
-  - `database/` - Database models and connection
-- `main.py` - Application entry point
-- `requirements.txt` - Python dependencies
-- `Dockerfile` - Container configuration
 
 ## Deployment
 
@@ -85,12 +83,13 @@ A dashboard for visualizing carrier campaign call data, featuring call outcomes,
 
 1. Install Docker
 2. Build and run:
-```bash
-docker build -t carrier-sales-dashboard .
-docker run -p 8000:8000 -e DATABASE_URL="your_db_url" carrier-sales-dashboard
+```docker build -f Dockerfile.dashboard -t carrier-campaign-dashboard .
+docker run -p 8501:8501 \
+  -e DATABASE_URL="your_db_url" \
+  carrier-sales-dashboard
 ```
 
-The dashboard will be available at http://localhost:8000
+The dashboard will be available at http://localhost:8501/
 
 
 ## Access
