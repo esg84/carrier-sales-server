@@ -1,0 +1,21 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System deps if needed for psycopg2
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential libpq-dev && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY dashboard.py .
+
+# Streamlit runs on 8501 by default
+EXPOSE 8501
+ENV PORT=8501
+
+# Disable usage stats, bind to all interfaces
+ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+
+CMD ["sh", "-c", "streamlit run dashboard.py --server.port ${PORT} --server.address 0.0.0.0"]
