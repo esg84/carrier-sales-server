@@ -233,34 +233,51 @@ def dashboard_metrics():
     with SessionLocal() as s:
         total = s.query(EventRow).count()
 
-        # outcomes
-        outcomes = dict((k, v) for k, v in s.execute(
-            text("SELECT call_outcome, COUNT(*) FROM call_events GROUP BY call_outcome")
-        ))
+        # ---- Outcomes (fixed categories) ----
+        outcome_counts = {"Success": 0, "No MC": 0, "Unsuccessful": 0}
+        for k, v in s.execute(text("""
+            SELECT call_outcome, COUNT(*) 
+            FROM call_events 
+            GROUP BY call_outcome
+        """)):
+            if not k:
+                continue
+            k_norm = str(k).strip()
+            if k_norm in outcome_counts:
+                outcome_counts[k_norm] = int(v)
 
-        # sentiments
-        sentiments = dict((k, v) for k, v in s.execute(
-            text("SELECT carrier_sentiment, COUNT(*) FROM call_events GROUP BY carrier_sentiment")
-        ))
+        # ---- Sentiments (fixed categories) ----
+        sentiment_counts = {"Negative": 0, "Neutral": 0, "Positive": 0}
+        for k, v in s.execute(text("""
+            SELECT carrier_sentiment, COUNT(*) 
+            FROM call_events 
+            GROUP BY carrier_sentiment
+        """)):
+            if not k:
+                continue
+            k_norm = str(k).strip().capitalize()  # normalize "negative" -> "Negative"
+            if k_norm in sentiment_counts:
+                sentiment_counts[k_norm] = int(v)
 
-        # negotiation rate
-        neg_count = s.execute(text("SELECT COUNT(*) FROM call_events WHERE is_negotiated = TRUE")).scalar() or 0
-        negotiation_rate = (neg_count / total) if total else 0
+        # Negotiation rate
+        neg_count = s.execute(
+            text("SELECT COUNT(*) FROM call_events WHERE is_negotiated = TRUE")
+        ).scalar() or 0
+        negotiation_rate = (neg_count / total) if total else 0.0
 
-        # averages (ignore NULLs)
+        # Averages (ignore NULLs)
         avg_base = s.execute(text("SELECT AVG(base_price) FROM call_events")).scalar() or 0
         avg_final = s.execute(text("SELECT AVG(final_price) FROM call_events")).scalar() or 0
 
     return {
-        "total_calls": total,
-        "outcomes": outcomes,
-        "sentiments": sentiments,
-        "negotiation_rate": negotiation_rate,
+        "total_calls": int(total),
+        "outcomes": outcome_counts,          # {"Success": x, "No MC": y, "Unsuccessful": z}
+        "sentiments": sentiment_counts,      # {"Negative": a, "Neutral": b, "Positive": c}
+        "negotiation_rate": float(negotiation_rate),
         "avg_base_price": float(avg_base),
         "avg_final_price": float(avg_final),
     }
 
-## DASHBOARD HTML
 
 DASHBOARD_HTML = """
 <!doctype html>
@@ -272,62 +289,108 @@ DASHBOARD_HTML = """
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:24px}
-    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin:16px 0 32px}
+    .cards{display:grid;grid-template-columns:repeat(4,minmax(240px,1fr));gap:16px;margin:16px 0 32px}
     .card{padding:16px;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .label{color:#6b7280;margin-bottom:6px}
     .num{font-size:28px;font-weight:700}
-    canvas{max-height:320px}
+    @media (max-width:1100px){ .cards{grid-template-columns:repeat(auto-fit,minmax(240px,1fr));} }
+    canvas{max-height:360px}
   </style>
 </head>
 <body>
-  <h1>Carrier Sales Dashboard</h1>
+  <h1 style="margin-bottom:8px;">Carrier Sales Dashboard</h1>
   <div class="cards">
-    <div class="card"><div>Total calls</div><div id="total" class="num">–</div></div>
-    <div class="card"><div>Negotiation rate</div><div id="negRate" class="num">–</div></div>
-    <div class="card"><div>Avg negotiation price</div><div id="avgBase" class="num">–</div></div>
-    <div class="card"><div>Overall Sentiment</div><div id="avgFinal" class="num">–</div></div>
+    <div class="card">
+      <div class="label">Total calls</div>
+      <div id="total" class="num">0</div>
+    </div>
+    <div class="card">
+      <div class="label">Negotiation rate</div>
+      <div id="negRate" class="num">0%</div>
+    </div>
+    <div class="card">
+      <div class="label">Avg negotiation price</div>
+      <div id="avgPrice" class="num">$0</div>
+    </div>
+    <div class="card">
+      <div class="label">Overall Sentiment</div>
+      <div id="overallSentiment" class="num">–</div>
+    </div>
   </div>
-  <div class="cards">
+
+  <div class="cards" style="grid-template-columns:1fr 1fr;">
     <div class="card"><canvas id="outcomes"></canvas></div>
     <div class="card"><canvas id="sentiments"></canvas></div>
   </div>
-<script>
-async function loadMetrics(){
-   const res = await fetch('/dashboard/metrics'); const m = await res.json();
-  document.getElementById('total').textContent = m.total_calls;
-  document.getElementById('negRate').textContent = (m.negotiation_rate*100).toFixed(0) + '%';
-  document.getElementById('avgBase').textContent = '$' + Math.round(m.avg_final_price);
-  document.getElementById('avgFinal').textContent = m.sentiments;
 
- new Chart(document.getElementById('outcomes'), {
-  type: 'bar',
-  data: {
-    labels: ['Booked'],  // hard-coded labels
-    datasets: [{
-      label: 'Outcomes',
-      data: [1],  // hard-coded values matching the labels above
-      backgroundColor: [
-        '#4CAF50'
-      ]
-    }]
+  <script>
+  async function loadMetrics() {
+    const res = await fetch('/dashboard/metrics');
+    const m = await res.json();
+
+    // KPIs
+    const total = m.total_calls || 0;
+    const negRate = ((m.negotiation_rate || 0) * 100).toFixed(0) + '%';
+    const avgPrice = '$' + Math.round(m.avg_final_price || 0); // use avg_final_price; swap to avg_base_price if you prefer
+
+    document.getElementById('total').textContent = total;
+    document.getElementById('negRate').textContent = negRate;
+    document.getElementById('avgPrice').textContent = avgPrice;
+
+    // Fixed categories
+    const outcomeLabels = ['Success', 'No MC', 'Unsuccessful'];
+    const sentimentLabels = ['Negative', 'Neutral', 'Positive'];
+
+    // Counts with safe defaults
+    const outcomesObj = m.outcomes || {};
+    const sentimentsObj = m.sentiments || {};
+    const outcomeCounts = outcomeLabels.map(k => Number(outcomesObj[k] || 0));
+    const sentimentCounts = sentimentLabels.map(k => Number(sentimentsObj[k] || 0));
+
+    // Dominant sentiment for the KPI card
+    const totalSent = sentimentCounts.reduce((a,b) => a+b, 0);
+    const maxIdx = sentimentCounts.indexOf(Math.max(...sentimentCounts, 0));
+    const dominant = totalSent > 0 ? sentimentLabels[maxIdx] : '–';
+    document.getElementById('overallSentiment').textContent = dominant;
+
+    // Outcomes bar (no legend)
+    new Chart(document.getElementById('outcomes'), {
+      type: 'bar',
+      data: {
+        labels: outcomeLabels,
+        datasets: [{
+          label: 'Outcomes',
+          data: outcomeCounts,
+          backgroundColor: ['#22c55e', '#9ca3af', '#f59e0b'] // green, gray, amber
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0 } }
+        }
+      }
+    });
+
+    // Sentiments pie
+    new Chart(document.getElementById('sentiments'), {
+      type: 'pie',
+      data: {
+        labels: sentimentLabels,
+        datasets: [{
+          label: 'Sentiment',
+          data: sentimentCounts,
+          backgroundColor: ['#ef4444', '#f59e0b', '#22c55e'] // red, amber, green
+        }]
+      }
+    });
   }
-});
-  new Chart(document.getElementById('sentiments'), {
-    type:'pie',
-    data: {
-    labels: ['Neutral'],
-    datasets: [{
-      label: 'Sentiment',
-      data: [100], 
-      backgroundColor: ['#4CAF50'] // optional colors
-    }]
-  }
-});
-}
-loadMetrics();
-</script>
+  loadMetrics();
+  </script>
 </body>
 </html>
 """
+
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard_page():
