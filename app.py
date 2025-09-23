@@ -136,6 +136,7 @@ with engine.begin() as conn:
 DASH_TOKEN = os.getenv("DASH_TOKEN", "eleni-happy-robot")
 
 class CallEvent(BaseModel):
+    # as before
     call_date: Optional[str] = None
     base_price: Optional[int] = None
     final_price: Optional[int] = None
@@ -144,6 +145,23 @@ class CallEvent(BaseModel):
     sentiment: Optional[str] = None
     mc_number: Optional[int] = None
     carrier_name: Optional[str] = None
+
+    # add the fields your handler uses (to avoid AttributeError)
+    load_destination: Optional[str] = None
+    call_duration: Optional[int] = None
+    is_negotiated: Optional[bool] = None
+    carrier_sentiment: Optional[str] = None
+
+    # ---- forgiving validators (v2 or v1) ----
+    if _P2:
+        @_validator("mc_number", "base_price", "final_price", "call_duration", mode="before")
+        @classmethod
+        def _coerce_int_fields_v2(cls, v):
+            return _coerce_int_like(v)
+    else:
+        @_validator("mc_number", "base_price", "final_price", "call_duration", pre=True)  # type: ignore
+        def _coerce_int_fields_v1(cls, v):  # type: ignore
+            return _coerce_int_like(v)
 
 def _as_int(v):
     try: return int(v)
