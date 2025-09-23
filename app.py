@@ -172,6 +172,17 @@ def _as_bool(v):
     if isinstance(v, str): return v.strip().lower() in ("true","1","yes","y")
     return None
 
+def _infer_is_negotiated(base: Optional[int], final: Optional[int], explicit: Optional[bool]) -> Optional[bool]:
+    """
+    If explicit flag provided, use it.
+    Otherwise infer: True when both prices exist and differ; else None.
+    """
+    if explicit is not None:
+        return explicit
+    if base is not None and final is not None:
+        return base != final
+    return None
+
 @app.post("/data/outcome")
 def outcome_event(
     payload: CallEvent = Body(...),
@@ -183,20 +194,26 @@ def outcome_event(
     if DASH_TOKEN and token != DASH_TOKEN:
         raise HTTPException(status_code=401, detail="invalid token")
 
-    row = EventRow(
-        call_date = payload.call_date,
-        base_price = _as_int(payload.base_price),
-        final_price = _as_int(payload.final_price),
-        load_origin = payload.load_origin,
-        load_destination = payload.load_destination,
-        call_outcome = payload.call_outcome,
-        call_duration = _as_int(payload.call_duration),
-        is_negotiated = _as_bool(payload.is_negotiated),
-        carrier_sentiment = (payload.sentiment or payload.carrier_sentiment),
-        mc_number = payload.mc_number,
-        carrier_name = payload.carrier_name,
-        server_received_at = datetime.utcnow()
-    )
+bp = _as_int(payload.base_price)
+fp = _as_int(payload.final_price)
+explicit_neg = _as_bool(payload.is_negotiated)
+neg_flag = _infer_is_negotiated(bp, fp, explicit_neg)
+
+row = EventRow(
+    call_date = payload.call_date,
+    base_price = bp,
+    final_price = fp,
+    load_origin = payload.load_origin,
+    load_destination = payload.load_destination,
+    call_outcome = payload.call_outcome,
+    call_duration = _as_int(payload.call_duration),
+    is_negotiated = neg_flag,  
+    carrier_sentiment = (payload.sentiment or payload.carrier_sentiment),
+    mc_number = payload.mc_number,
+    carrier_name = payload.carrier_name,
+    server_received_at = datetime.utcnow()
+)
+
     with SessionLocal() as s:
         s.add(row)
         s.commit()
@@ -260,9 +277,17 @@ def dashboard_metrics():
                 sentiment_counts[k_norm] = int(v)
 
         # Negotiation rate
-        neg_count = s.execute(
-            text("SELECT COUNT(*) FROM call_events WHERE is_negotiated = TRUE")
-        ).scalar() or 0
+        neg_count = s.execute(text("""
+    SELECT COUNT(*) FROM call_events
+    WHERE COALESCE(
+        is_negotiated,
+        CASE
+            WHEN base_price IS NOT NULL AND final_price IS NOT NULL AND base_price <> final_price
+            THEN TRUE ELSE FALSE
+        END
+    ) = TRUE
+""")).scalar() or 0
+
         negotiation_rate = (neg_count / total) if total else 0.0
 
         # Averages (ignore NULLs)
