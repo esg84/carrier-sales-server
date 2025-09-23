@@ -11,6 +11,34 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import Integer, String, Boolean, DateTime
 
+
+def _coerce_int_like(v) -> Optional[int]:
+    """
+    Accept None, "", "  ", "$1,900", "1,900", "1900", 1900, 1900.0.
+    Returns int or None. Non-numeric -> None.
+    """
+    if v is None:
+        return None
+    if isinstance(v, int):
+        return v
+    if isinstance(v, float):
+        try:
+            return int(v)
+        except Exception:
+            return None
+    if isinstance(v, str):
+        s = v.strip()
+        if s == "":
+            return None
+        digits = "".join(ch for ch in s if ch.isdigit())
+        if digits == "":
+            return None
+        try:
+            return int(digits)
+        except ValueError:
+            return None
+    return None
+
 app = FastAPI(title="Loads API", version="1.0.0")
 
 # allow for calls from browser or other servers
